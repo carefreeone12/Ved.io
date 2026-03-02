@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>OrchestrAI — Job {{ job_id[:8] }}</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"/>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css"/>
+  <style>
+    :root{--accent:#7c3aed;--accent-light:#a78bfa;--bg:#0f0f1a;--surface:#1a1a2e;--border:#2d2d4e}
+    body{background:var(--bg);color:#e2e8f0;font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh}
+    .navbar{background:var(--surface)!important;border-bottom:1px solid var(--border)}
+    .logo{font-weight:800;font-size:1.4rem;background:linear-gradient(135deg,#7c3aed,#06b6d4);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+    .card{background:var(--surface);border:1px solid var(--border);border-radius:16px}
+    .card-header{background:rgba(124,58,237,.15);border-bottom:1px solid var(--border);border-radius:15px 15px 0 0!important}
+    .progress{background:#16213e;height:12px;border-radius:999px}
+    .progress-bar{background:linear-gradient(90deg,var(--accent),#06b6d4);transition:width .5s ease}
+    .score-ring{width:90px;height:90px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.5rem;font-weight:800;border:4px solid var(--border)}
+    .score-good{border-color:#10b981;color:#34d399}
+    .score-mid{border-color:#f59e0b;color:#fbbf24}
+    .score-bad{border-color:#ef4444;color:#f87171}
+    .stage-badge{padding:.35rem .75rem;border-radius:999px;font-size:.8rem;font-weight:600}
+    .stage-pending{background:rgba(100,116,139,.2);color:#94a3b8}
+    .stage-done{background:rgba(16,185,129,.2);color:#34d399}
+    .stage-failed{background:rgba(239,68,68,.2);color:#f87171}
+    .stage-active{background:rgba(124,58,237,.2);color:#a78bfa;animation:pulse 2s infinite}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.6}}
+    .scene-card{background:#16213e;border:1px solid var(--border);border-radius:12px;padding:1rem;transition:all .3s}
+    .scene-card.regenerated{border-color:#7c3aed}
+    .scene-img{width:100%;height:120px;object-fit:cover;border-radius:8px;background:#0f0f1a}
+    .iteration-tag{font-size:.7rem;padding:.15rem .4rem;border-radius:4px;background:rgba(124,58,237,.25);color:#a78bfa}
+    .ai-disclosure{background:rgba(6,182,212,.1);border:1px solid rgba(6,182,212,.3);border-radius:8px;padding:.75rem 1rem;font-size:.8rem;color:#38bdf8}
+    video{width:100%;border-radius:12px;background:#000}
+  </style>
+</head>
+<body>
+
+<nav class="navbar navbar-dark py-3">
+  <div class="container">
+    <a href="/" class="logo text-decoration-none"><i class="bi bi-camera-video-fill me-2"></i>OrchestrAI</a>
+    <a href="/" class="btn btn-outline-secondary btn-sm"><i class="bi bi-plus-lg me-1"></i>New Job</a>
+  </div>
+</nav>
+
+<div class="container py-4">
+
+  <!-- Job header -->
+  <div class="d-flex align-items-center gap-3 mb-4">
+    <div>
+      <h4 class="mb-1" id="jobTitle">Loading...</h4>
+      <code class="text-secondary small">{{ job_id }}</code>
+    </div>
+    <span class="stage-badge stage-pending ms-auto" id="stageBadge">pending</span>
+  </div>
+
+  <!-- Progress bar -->
+  <div class="card mb-4">
+    <div class="card-body p-4">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <span class="fw-semibold" id="stageLabel">Starting pipeline...</span>
+        <span class="text-secondary small" id="iterLabel"></span>
+      </div>
+      <div class="progress mb-3">
+        <div class="progress-bar" id="progressBar" style="width:0%"></div>
+      </div>
+      <div class="d-flex gap-4 align-items-center">
+        <div class="score-ring score-bad" id="scoreRing">—</div>
+        <div>
+          <p class="mb-1 fw-semibold">Critic Score</p>
+          <p class="text-secondary small mb-0">Target: ≥ 7.5 / 10 to pass</p>
+          <p class="text-secondary small mb-0" id="scoreHelp"></p>
+        </div>
+        <div class="ms-auto text-end">
+          <div class="text-secondary small">Scenes</div>
+          <div class="fw-bold fs-5" id="sceneCount">—</div>
+        </div>
+        <div class="text-end">
+          <div class="text-secondary small">Duration</div>
+          <div class="fw-bold fs-5" id="duration">—</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4">
+    <!-- Scenes grid -->
+    <div class="col-lg-8">
+      <div class="card">
+        <div class="card-header py-3 d-flex align-items-center justify-content-between">
+          <h6 class="mb-0"><i class="bi bi-grid-3x3 me-2"></i>Scene Status</h6>
+          <button class="btn btn-sm btn-outline-warning d-none" id="regenBtn">
+            <i class="bi bi-arrow-clockwise me-1"></i>Regenerate Selected
+          </button>
+        </div>
+        <div class="card-body p-3">
+          <div class="row g-2" id="sceneGrid">
+            <div class="col-12 text-center py-4 text-secondary">
+              <div class="spinner-border spinner-border-sm me-2"></div>Waiting for scenes...
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right panel -->
+    <div class="col-lg-4">
+      <!-- Script preview -->
+      <div class="card mb-3">
+        <div class="card-header py-3"><h6 class="mb-0"><i class="bi bi-file-text me-2"></i>Generated Script</h6></div>
+        <div class="card-body p-3" id="scriptPreview">
+          <p class="text-secondary small text-center py-2">Script will appear here...</p>
+        </div>
+      </div>
+
+      <!-- Safety -->
+      <div class="card mb-3 d-none" id="safetyCard">
+        <div class="card-header py-3"><h6 class="mb-0"><i class="bi bi-shield-check me-2"></i>Safety Report</h6></div>
+        <div class="card-body p-3" id="safetyBody"></div>
+      </div>
+
+      <!-- Video preview -->
+      <div class="card d-none" id="videoCard">
+        <div class="card-header py-3"><h6 class="mb-0"><i class="bi bi-play-circle me-2"></i>Preview</h6></div>
+        <div class="card-body p-3">
+          <video controls id="videoPlayer"></video>
+          <div class="mt-3 d-grid gap-2">
+            <a href="#" class="btn btn-success" id="downloadBtn">
+              <i class="bi bi-download me-2"></i>Download MP4
+            </a>
+          </div>
+          <div class="ai-disclosure mt-3" id="aiDisclosure"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const JOB_ID = "{{ job_id }}";
+let pollInterval = null;
+let selectedScenes = new Set();
+
+function poll() {
+  fetch(`/api/v1/status/${JOB_ID}`)
+    .then(r => r.json())
+    .then(data => updateUI(data))
+    .catch(console.error);
+}
+
+function updateUI(data) {
+  document.getElementById('jobTitle').textContent = data.title || 'Video Job';
+
+  // Stage badge
+  const stageEl = document.getElementById('stageBadge');
+  stageEl.textContent = data.stage;
+  stageEl.className = 'stage-badge ms-auto stage-' +
+    (data.stage === 'done' ? 'done' : data.stage === 'failed' ? 'failed' : 'active');
+
+  // Progress
+  document.getElementById('progressBar').style.width = (data.progress_pct || 0) + '%';
+  document.getElementById('stageLabel').textContent = stageLabel(data.stage);
+  document.getElementById('iterLabel').textContent =
+    data.stage !== 'pending' ? `Iteration ${data.current_iteration}/${data.max_iterations}` : '';
+
+  // Score ring
+  const score = data.critic_score || 0;
+  const ring = document.getElementById('scoreRing');
+  ring.textContent = score ? score.toFixed(1) : '—';
+  ring.className = 'score-ring ' + (score >= 7.5 ? 'score-good' : score >= 5 ? 'score-mid' : 'score-bad');
+  document.getElementById('scoreHelp').textContent =
+    score > 0 ? (score >= 7.5 ? '✅ Quality threshold met' : `⚠️ ${(7.5 - score).toFixed(1)} below threshold`) : '';
+
+  // Scene count + duration
+  document.getElementById('sceneCount').textContent = data.scenes?.length || '—';
+  document.getElementById('duration').textContent =
+    data.draft_result?.total_duration ? `${data.draft_result.total_duration.toFixed(0)}s` : '—';
+
+  // Script preview
+  if (data.script?.hook) {
+    document.getElementById('scriptPreview').innerHTML = `
+      <div class="mb-2"><span class="badge bg-primary me-1">Hook</span> <small>${data.script.hook}</small></div>
+      ${(data.script.scenes || []).map(s =>
+        `<div class="mb-1 text-secondary small"><span class="badge bg-secondary me-1">${s.id}</span>${s.text.substring(0,80)}...</div>`
+      ).join('')}
+      <div class="mt-2"><span class="badge bg-success me-1">CTA</span> <small>${data.script.cta || ''}</small></div>`;
+  }
+
+  // Scenes grid
+  if (data.scenes?.length) {
+    const grid = document.getElementById('sceneGrid');
+    grid.innerHTML = data.scenes.map(sc => `
+      <div class="col-6 col-md-4">
+        <div class="scene-card ${sc.stage === 'regenerated' ? 'regenerated' : ''}">
+          ${sc.image_url
+            ? `<img src="${sc.image_url}" class="scene-img mb-2" alt="Scene ${sc.scene_id}"/>`
+            : `<div class="scene-img mb-2 d-flex align-items-center justify-content-center text-secondary"><i class="bi bi-image fs-3"></i></div>`}
+          <div class="d-flex justify-content-between align-items-center">
+            <span class="small fw-semibold">Scene ${sc.scene_id}</span>
+            <span class="small">${sc.score ? sc.score.toFixed(1) + '/10' : ''}</span>
+          </div>
+          ${sc.issue ? `<div class="text-danger small mt-1">${sc.issue}</div>` : ''}
+          ${sc.stage === 'regenerated' ? `<span class="iteration-tag">re-gen</span>` : ''}
+        </div>
+      </div>`).join('');
+  }
+
+  // Safety card
+  if (data.safety_result?.passed !== undefined) {
+    document.getElementById('safetyCard').classList.remove('d-none');
+    document.getElementById('safetyBody').innerHTML =
+      `<div class="${data.safety_result.passed ? 'text-success' : 'text-danger'} fw-semibold mb-2">
+        <i class="bi bi-${data.safety_result.passed ? 'check-circle' : 'x-circle'} me-1"></i>
+        ${data.safety_result.passed ? 'All checks passed' : 'Safety violations found'}
+      </div>
+      <div class="small text-secondary">Score: ${data.safety_result.safety_score}/100</div>`;
+  }
+
+  // Video preview & download
+  if (data.stage === 'done' && data.download_url) {
+    document.getElementById('videoCard').classList.remove('d-none');
+    document.getElementById('videoPlayer').src = data.download_url;
+    document.getElementById('downloadBtn').href = `/api/v1/download/${JOB_ID}`;
+    if (data.ai_disclosure) {
+      document.getElementById('aiDisclosure').textContent = data.ai_disclosure;
+    }
+    clearInterval(pollInterval);
+  }
+
+  if (data.stage === 'failed') {
+    clearInterval(pollInterval);
+    document.getElementById('stageLabel').innerHTML = `<span class="text-danger">❌ ${data.error || 'Pipeline failed'}</span>`;
+  }
+}
+
+function stageLabel(stage) {
+  const labels = {
+    pending: 'Initializing pipeline...',
+    script: '✍️ Script Engineer: structuring content...',
+    visual: '🎨 Scene Planner + Asset Orchestrator: generating visuals...',
+    assembly: '🎬 Draft Assembler: building video...',
+    critique: '🧐 Critic Agent: evaluating quality...',
+    refining: '🔁 Replanner: fixing low-score scenes...',
+    safety: '🛡️ Safety Agent: compliance check...',
+    done: '✅ Pipeline complete!',
+    failed: '❌ Pipeline failed',
+  };
+  return labels[stage] || stage;
+}
+
+// Start polling
+poll();
+pollInterval = setInterval(poll, 2500);
+</script>
+</body>
+</html>

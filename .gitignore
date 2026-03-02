@@ -1,68 +1,78 @@
-# Binaries
-bin/
-drama-generator
-backend
-*.exe
-*.dll
-*.so
-*.dylib
-drama-generator.exe
-
-# Test binary
-*.test
-
-# Output of the go coverage tool
-*.out
-
-# Dependency directories
-vendor/
-
-# Go workspace file
-go.work
-
-# IDE
-.idea/
-.vscode/
-*.swp
-*.swo
-*~
-
-# Environment
-.env
-.env.local
-
-# Logs
-*.log
-
-# OS
-.DS_Store
-Thumbs.db
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+*.pyo
+.venv/
+venv/
+env/
 
 # Build
 dist/
 build/
+*.egg-info/
+.eggs/
 
-# Temporary files
-tmp/
-temp/
+# Coverage
+.coverage
+htmlcov/
+coverage.xml
+.pytest_cache/
 
-# Data (database and uploaded files)
-data/drama_generator.db
-data/storage/videos/*
-!data/storage/videos/.gitkeep
+# Type checking
+.mypy_cache/
+.ruff_cache/
 
-# Frontend build output
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Environment
+.env
+*.env.local
+*.env.production
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Data and uploads
+data/
+*.mp4
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.webp
+
+# Node / Frontend
+node_modules/
 web/dist/
-web/node_modules/
-web/.vite/
-web/.env.local
+web/.nuxt/
+.npm
 
-# Config file (use config.example.yaml as template)
-configs/config.yaml
+# Go (original backend)
+*.exe
+*.exe~
+drama-generator
+vendor/
 
-# Docker publish documentation (optional)
-DOCKER_PUBLISH.md
-build.sh
-/data/storage/
-/web/package-lock.json
+# macOS
 .DS_Store
+.AppleDouble
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Logs
+*.log
+logs/
+
+# Docker
+.dockerignore

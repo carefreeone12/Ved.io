@@ -1,0 +1,68 @@
+# ==================== Stage 1: Frontend Builder ====================
+FROM node:20-alpine AS frontend-builder
+
+WORKDIR /app/web
+COPY web/package*.json ./
+RUN npm install
+COPY web/ ./
+RUN npm run build
+
+# ==================== Stage 2: Python Builder ====================
+FROM python:3.11-slim AS python-builder
+
+WORKDIR /app
+
+# Install build deps
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies into a venv for clean copy
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+COPY backend-py/pyproject.toml ./
+RUN pip install --upgrade pip && pip install -e ".[dev]" --no-cache-dir || \
+    pip install fastapi uvicorn[standard] sqlalchemy[asyncio] alembic aiosqlite asyncpg \
+    pydantic pydantic-settings structlog httpx python-multipart aiofiles \
+    ffmpeg-python apscheduler tenacity cachetools pillow slowapi pyyaml \
+    google-generativeai openai --no-cache-dir
+
+# ==================== Stage 3: Runtime ====================
+FROM python:3.11-slim
+
+# Install runtime system deps
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ffmpeg \
+    ca-certificates \
+    wget \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy virtual environment from builder
+COPY --from=python-builder /opt/venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+WORKDIR /app
+
+# Copy Python application
+COPY backend-py/ ./
+
+# Copy frontend build
+COPY --from=frontend-builder /app/web/dist ./web/dist
+
+# Copy existing Go config as template (for YAML compatibility)
+COPY configs/ ./configs/
+
+# Create data directories
+RUN mkdir -p /app/data/storage
+
+# Expose port
+EXPOSE 5678
+
+# Healthcheck
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:5678/health || exit 1
+
+# Entry point
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "5678", "--workers", "2"]
